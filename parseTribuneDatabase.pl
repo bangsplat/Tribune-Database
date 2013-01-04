@@ -80,6 +80,8 @@ open( OUTPUT_FILE, ">", $output_param )
 $result = read( INPUT_FILE, $xml_file, $file_size );
 ### do some error checking here
 
+close( INPUT_FILE );
+
 # output the header row
 print OUTPUT_FILE "TMSId\t" .
 					"altFilmId\t" .
@@ -128,11 +130,13 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 		while ( $titles =~ m/<title (.*?)>(.*?)<\/title>/gms ) {
 			$title_attributes = $1;
 			$title = $2;
-			if ( $title_attributes =~ m/type="full"/ ) { $title_text = $title; }
+			if ( $title_attributes =~ m/type="full"/ ) {
+				$title_text = unescape( $title );
+			}
 		}
 		
 #		if ( $debug_param ) { print "DEBUG: Title Attributes: $title_attributes\n"; }
-		if ( $debug_param ) { print "DEBUG: Title: $title_text\n"; }
+#		if ( $debug_param ) { print "DEBUG: Title: $title_text\n"; }
 
 	}
 	
@@ -141,12 +145,11 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 						"$altFilmId\t" .
 						"$rootId\t" .
 						"$connectorId\t" .
-						"$title\n";
+						"$title_text\n";
 			
 }
 
-
-
+close( OUTPUT_FILE );
 
 
 ### XML fields
@@ -287,5 +290,7 @@ sub unescape($) {
 	$myString =~ s/&amp;/&/g;	# replace any &amp; with &
 	$myString =~ s/&lt;/</g;	# replace any &lt; with <
 	$myString =~ s/&gt;/>/g;	# replace any &gt; with >
+	$myString =~ s/&apos;/'/g;	# replace any &apos; with '
+	$myString =~ s/&quot;/"/g;	# replace any &quot; with "
 	return( $myString );
 }
