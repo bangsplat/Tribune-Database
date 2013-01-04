@@ -84,8 +84,66 @@ $result = read( INPUT_FILE, $xml_file, $file_size );
 print OUTPUT_FILE "TMSId\t" .
 					"altFilmId\t" .
 					"rootId\t" .
-					"connectorId\n";
+					"connectorId\t" .
+					"title\n";
 
+##### update header row as we figure out the right fields to use
+
+## here is where we parse the feed
+
+my ( $program, $program_attributes );
+my ( $TMSId, $altFilmId, $rootId, $versionId, $connectorId );
+my ( $titles, $title, $title_attributes, $title_size, $title_type, $title_lang, $title_text );
+
+
+while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
+	$program_attributes = $1;
+	$program = $2;
+	
+#	if ( $debug_param ) { print "DEBUG: program attributes: $program_attributes\n"; }
+	
+	# get the various IDs from the program tag attributes
+	if ( $program_attributes =~ m/TMSId="(.*?)"/ ) { $TMSId = $1; }
+		else { $TMSId = ""; }
+	if ( $program_attributes =~ m/altFilmId="(.*?)"/ ) { $altFilmId = $1; }
+		else { $altFilmId = ""; }
+	if ( $program_attributes =~ m/rootId="(.*?)"/ ) { $rootId = $1; }
+		else { $rootId = ""; }
+	if ( $program_attributes =~ m/connectorId="(.*?)"/ ) { $connectorId = $1; }
+		else { $connectorId = ""; }
+	
+#	if ( $debug_param ) { print "DEBUG: TMS ID: $TMSId\n"; }
+#	if ( $debug_param ) { print "DEBUG: altFilm ID: $altFilmId\n"; }
+#	if ( $debug_param ) { print "DEBUG: root ID: $rootId\n"; }
+#	if ( $debug_param ) { print "DEBUG: connector ID: $connectorId\n"; }
+	
+	# get the titles tag
+	if ( $program =~ m/<titles>(.*?)<\/titles>/ms ) {
+		$titles = $1;
+		
+		### there may be more than one <title>
+		### we want the one where type="full"
+		
+		$title_text = "";
+		while ( $titles =~ m/<title (.*?)>(.*?)<\/title>/gms ) {
+			$title_attributes = $1;
+			$title = $2;
+			if ( $title_attributes =~ m/type="full"/ ) { $title_text = $title; }
+		}
+		
+#		if ( $debug_param ) { print "DEBUG: Title Attributes: $title_attributes\n"; }
+		if ( $debug_param ) { print "DEBUG: Title: $title_text\n"; }
+
+	}
+	
+	
+	print OUTPUT_FILE "$TMSId\t" .
+						"$altFilmId\t" .
+						"$rootId\t" .
+						"$connectorId\t" .
+						"$title\n";
+			
+}
 
 
 
@@ -214,3 +272,20 @@ print OUTPUT_FILE "TMSId\t" .
 # origAudioLang
 
 
+
+
+
+sub trim($) {
+	my $myString = shift;
+	$myString =~ s/^\s+//;	# trim any leading whitespace
+	$myString =~ s/\s+$//;	# trim any trailing whitespace
+	return( $myString );
+}
+
+sub unescape($) {
+	my $myString = shift;
+	$myString =~ s/&amp;/&/g;	# replace any &amp; with &
+	$myString =~ s/&lt;/</g;	# replace any &lt; with <
+	$myString =~ s/&gt;/>/g;	# replace any &gt; with >
+	return( $myString );
+}
