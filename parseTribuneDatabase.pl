@@ -87,7 +87,9 @@ print OUTPUT_FILE "TMSId\t" .
 					"altFilmId\t" .
 					"rootId\t" .
 					"connectorId\t" .
-					"title\n";
+					"title\t" .
+					"description\t" .
+					"cast\n";
 
 ##### update header row as we figure out the right fields to use
 
@@ -96,56 +98,109 @@ print OUTPUT_FILE "TMSId\t" .
 my ( $program, $program_attributes );
 my ( $TMSId, $altFilmId, $rootId, $versionId, $connectorId );
 my ( $titles, $title, $title_attributes, $title_size, $title_type, $title_lang, $title_text );
-
+my ( $descriptions, $description, $description_attributes, $longest_description_length, $longest_description );
+my ( $description_size, $description_type, $description_lang, $description_text );
+my ( $cast, $cast_member, $cast_member_attributes, $cast_person_id, $cast_ord, $cast_role );
+my ( $cast_character_name, $cast_name, $cast_name_first, $cast_name_last, $cast_list );
 
 while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
-	$program_attributes = $1;
-	$program = $2;
-	
-#	if ( $debug_param ) { print "DEBUG: program attributes: $program_attributes\n"; }
+	$program_attributes = trim( $1 );
+	$program = trim( $2 );
 	
 	# get the various IDs from the program tag attributes
-	if ( $program_attributes =~ m/TMSId="(.*?)"/ ) { $TMSId = $1; }
+	if ( $program_attributes =~ m/TMSId="(.*?)"/ ) { $TMSId = trim( $1 ); }
 		else { $TMSId = ""; }
-	if ( $program_attributes =~ m/altFilmId="(.*?)"/ ) { $altFilmId = $1; }
+	if ( $program_attributes =~ m/altFilmId="(.*?)"/ ) { $altFilmId = trim( $1 ); }
 		else { $altFilmId = ""; }
-	if ( $program_attributes =~ m/rootId="(.*?)"/ ) { $rootId = $1; }
+	if ( $program_attributes =~ m/rootId="(.*?)"/ ) { $rootId = trim( $1 ); }
 		else { $rootId = ""; }
-	if ( $program_attributes =~ m/connectorId="(.*?)"/ ) { $connectorId = $1; }
+	if ( $program_attributes =~ m/connectorId="(.*?)"/ ) { $connectorId = trim( $1 ); }
 		else { $connectorId = ""; }
-	
-#	if ( $debug_param ) { print "DEBUG: TMS ID: $TMSId\n"; }
-#	if ( $debug_param ) { print "DEBUG: altFilm ID: $altFilmId\n"; }
-#	if ( $debug_param ) { print "DEBUG: root ID: $rootId\n"; }
-#	if ( $debug_param ) { print "DEBUG: connector ID: $connectorId\n"; }
 	
 	# get the titles tag
 	if ( $program =~ m/<titles>(.*?)<\/titles>/ms ) {
-		$titles = $1;
+		$titles = trim( $1 );
 		
-		### there may be more than one <title>
-		### we want the one where type="full"
+		# there may be more than one <title>
+		# we want the one where type="full"
 		
 		$title_text = "";
 		while ( $titles =~ m/<title (.*?)>(.*?)<\/title>/gms ) {
-			$title_attributes = $1;
-			$title = $2;
-			if ( $title_attributes =~ m/type="full"/ ) {
-				$title_text = unescape( $title );
-			}
+			$title_attributes = trim( $1 );
+			$title = trim( $2 );
+			if ( $title_attributes =~ m/type="full"/ ) { $title_text = unescape( $title ); }
 		}
-		
-#		if ( $debug_param ) { print "DEBUG: Title Attributes: $title_attributes\n"; }
-#		if ( $debug_param ) { print "DEBUG: Title: $title_text\n"; }
-
 	}
 	
+	#  get the descriptions tag
+	if ( $program =~ m/<descriptions>(.*?)<\/descriptions>/ms ) {
+		$descriptions = trim( $1 );
+		
+		# there may be more than one description
+		# we want the longest one with type="plot"
+		
+		$longest_description = "";
+		$longest_description_length = 0;
+		
+		while ( $descriptions =~ m/<desc (.*?)>(.*?)<\/desc>/gms ) {
+			$description_attributes = trim( $1 );
+			$description = trim( $2 );
+			
+			if ( $description_attributes =~ m/size="(.*?)"/ ) { $description_size = trim( $1 ); }
+				else { $description_size = ""; }
+			if ( $description_attributes =~ m/type="(.*?)"/ ) { $description_type = trim( $1 ); }
+				else { $description_type = ""; }
+			if ( $description_attributes =~ m/lang="(.*?)"/ ) { $description_lang = trim( $1 ); }
+				else { $description_lang = ""; }
+			
+			if ( ( $description_type eq "plot" ) && ( $description_size > $longest_description_length ) ) {
+				$longest_description = $description;
+				$longest_description_length = $description_size;
+			}
+		}
+		$description_text = unescape( $longest_description );
+	}
+	
+#	my ( $cast, $cast_member, $cast_member_attributes, $cast_person_id, $cast_ord, $cast_role );
+#	my ( $cast_character_name, $cast_name, $cast_name_first, $cast_name_last, $cast_list );
+	
+	$cast_list = "";
+	# get the cast tag
+	if ( $program =~ m/<cast>(.*?)<\/cast>/ms ) {
+		$cast = trim( $1 );
+		while ( $cast =~ m/<member (.*?)>(.*?)<\/member>/gms ) {
+			$cast_member_attributes = trim( $1 );
+			$cast_member = trim( $2 );
+			
+			if ( $cast_member_attributes =~ m/personId="(.*?)"/ ) { $cast_person_id = trim( $1 ); }
+				else { $cast_person_id = ""; }
+			if ( $cast_member_attributes =~ m/ord="(.*?)"/ ) { $cast_ord = trim( $1 ); }
+				else { $cast_ord = ""; }
+			
+			### character name?
+			
+			if ( $cast_member =~ m/<name (.*?)>(.*?)<\/name>/ms ) {
+				$cast_person_id = trim( $1 );		### not strictly correct, but I'm not going to use this
+				$cast_name = trim( $2 );
+				
+				if ( $cast_name =~ m/<first>(.*?)<\/first>/ ) { $cast_name_first = unescape( trim( $1 ) ); }
+					else { $cast_name_first = ""; }
+				if ( $cast_name =~ m/<last>(.*?)<\/last>/ ) { $cast_name_last = unescape( trim( $1 ) ); }
+					else { $cast_name_last = ""; }
+				
+				if ( $cast_list ne "" ) { $cast_list .= ", "; }
+				$cast_list .= "$cast_name_first $cast_name_last";
+			}
+		}
+	}
 	
 	print OUTPUT_FILE "$TMSId\t" .
 						"$altFilmId\t" .
 						"$rootId\t" .
 						"$connectorId\t" .
-						"$title_text\n";
+						"$title_text\t" .
+						"$description_text\t" .
+						"$cast_list\n";
 			
 }
 
@@ -153,25 +208,6 @@ close( OUTPUT_FILE );
 
 
 ### XML fields
-# TMSId
-# altFilmId
-# rootId
-# versionId
-# connectorId
-
-# titles
-# title
-# title size
-# title type			<- we want "full"
-# title lang
-# title text			<- this is the actual title
-
-# descriptions
-# description
-# description size		<- we want largest value - 500? 250?
-# description type		<- we want "plot"
-# description lang
-# description text
 
 # cast
 # member
