@@ -15,6 +15,17 @@ use Getopt::Long;
 
 my ( $input_param, $output_param, $debug_param, $help_param, $version_param );
 my ( $result, $xml_file, $file_size );
+my ( $program, $program_attributes );
+my ( $TMSId, $altFilmId, $rootId, $versionId, $connectorId );
+my ( $titles, $title, $title_attributes, $title_size, $title_type, $title_lang, $title_text );
+my ( $descriptions, $description, $description_attributes, $longest_description_length, $longest_description );
+my ( $description_size, $description_type, $description_lang, $description_text );
+my ( $cast, $cast_member, $cast_member_attributes, $cast_person_id, $cast_ord, $cast_role );
+my ( $cast_character_name, $cast_name, $cast_name_first, $cast_name_last, $cast_list );
+my ( $director_list, $crew, $crew_member, $crew_member_attributes, $crew_member_role );
+my ( $crew_member_name, $crew_member_name_attributes, $crew_member_name_id );
+my ( $crew_member_person_id, $crew_member_ord, $crew_member_role );
+my ( $crew_member_name_id, $crew_member_name_first, $crew_member_name_last );
 
 GetOptions(	'input|i=s'		=>	\$input_param,
 			'output|o=s'	=>	\$output_param,
@@ -89,19 +100,12 @@ print OUTPUT_FILE "TMSId\t" .
 					"connectorId\t" .
 					"title\t" .
 					"description\t" .
-					"cast\n";
+					"cast\t" .
+					"director\n";
 
 ##### update header row as we figure out the right fields to use
 
 ## here is where we parse the feed
-
-my ( $program, $program_attributes );
-my ( $TMSId, $altFilmId, $rootId, $versionId, $connectorId );
-my ( $titles, $title, $title_attributes, $title_size, $title_type, $title_lang, $title_text );
-my ( $descriptions, $description, $description_attributes, $longest_description_length, $longest_description );
-my ( $description_size, $description_type, $description_lang, $description_text );
-my ( $cast, $cast_member, $cast_member_attributes, $cast_person_id, $cast_ord, $cast_role );
-my ( $cast_character_name, $cast_name, $cast_name_first, $cast_name_last, $cast_list );
 
 while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 	$program_attributes = trim( $1 );
@@ -161,11 +165,8 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 		$description_text = unescape( $longest_description );
 	}
 	
-#	my ( $cast, $cast_member, $cast_member_attributes, $cast_person_id, $cast_ord, $cast_role );
-#	my ( $cast_character_name, $cast_name, $cast_name_first, $cast_name_last, $cast_list );
-	
-	$cast_list = "";
 	# get the cast tag
+	$cast_list = "";
 	if ( $program =~ m/<cast>(.*?)<\/cast>/ms ) {
 		$cast = trim( $1 );
 		while ( $cast =~ m/<member (.*?)>(.*?)<\/member>/gms ) {
@@ -193,6 +194,51 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 			}
 		}
 	}
+		
+	# get crew tag
+	$director_list = "";
+	if ( $program =~ m/<crew>(.*?)<\/crew>/ms ) {
+		$crew = trim( $1 );
+		while ( $crew =~ m/<member (.*?)>(.*?)<\/member>/gms ) {
+			$crew_member_attributes = trim( $1 );
+			$crew_member = trim( $2 );
+			
+			if ( $crew_member_attributes =~ m/personId="(.*?)"/ ) { $crew_member_person_id = trim( $1 ); }
+				else { $crew_member_person_id = ""; }
+			if ( $crew_member_attributes =~ m/ord="(.*?)"/ ) { $crew_member_ord = trim( $1 ); }
+				else { $crew_member_ord = ""; }
+			
+			if ( $crew_member =~ m/<role>(.*?)<\/role>/ ) { $crew_member_role = trim( $1 ); }
+				else { $crew_member_role = ""; }
+			
+			if ( $crew_member =~ m/<name (.*?)>(.*?)<\/name>/ms ) {
+				$crew_member_name_attributes = trim( $1 );
+				$crew_member_name = trim( $2 );
+				
+				if ( $crew_member_name_attributes =~ m/nameId="(.*?)"/ ) {
+					$crew_member_name_id = trim( $1 );
+				} else { $crew_member_name_id = ""; }
+			
+				if ( $crew_member_name =~ m/<first>(.*?)<\/first>/ ) {
+					$crew_member_name_first = unescape( trim( $1 ) );
+				} else { $crew_member_name_first = ""; }
+			
+				if ( $crew_member_name =~ m/<last>(.*?)<\/last>/ ) {
+					$crew_member_name_last = unescape( trim( $1 ) );
+				} else { $crew_member_name_last = ""; }
+				
+				if ( $crew_member_role eq "Director" ) {
+					if ( $director_list ne "" ) { $director_list .= ", "; }
+					$director_list .= "$crew_member_name_first $crew_member_name_last";
+				}
+			}
+		}
+	}
+	
+	# get runTime tag
+	
+	
+	
 	
 	print OUTPUT_FILE "$TMSId\t" .
 						"$altFilmId\t" .
@@ -200,7 +246,8 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 						"$connectorId\t" .
 						"$title_text\t" .
 						"$description_text\t" .
-						"$cast_list\n";
+						"$cast_list\t" .
+						"$director_list\n";
 			
 }
 
@@ -208,30 +255,6 @@ close( OUTPUT_FILE );
 
 
 ### XML fields
-
-# cast
-# member
-# personId
-# ord
-# role					<- we want "Actor"
-# characterName
-# name
-# name nameId
-# name first
-# name last
-### use first x cast members
-### put the names into a comma-delimited list in a single column
-
-# crew
-# member
-# personId
-# ord
-# role					<- we want "Director"
-# name
-# name nameId
-# name first
-# name last
-### if there is more than one director, put each into a comma-delimited list in a single column
 
 # runTime
 
