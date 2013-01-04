@@ -81,24 +81,136 @@ $result = read( INPUT_FILE, $xml_file, $file_size );
 ### do some error checking here
 
 # output the header row
-print OUTPUT_FILE "blah\t" .
-					"blah\t" .
-					"blah\n";
-
-##### need to figure out what our header is
-
+print OUTPUT_FILE "TMSId\t" .
+					"altFilmId\t" .
+					"rootId\t" .
+					"connectorId\n";
 
 
 
 
 
 
+### XML fields
+# TMSId
+# altFilmId
+# rootId
+# versionId
+# connectorId
 
+# titles
+# title
+# title size
+# title type			<- we want "full"
+# title lang
+# title text			<- this is the actual title
 
+# descriptions
+# description
+# description size		<- we want largest value - 500? 250?
+# description type		<- we want "plot"
+# description lang
+# description text
 
+# cast
+# member
+# personId
+# ord
+# role					<- we want "Actor"
+# characterName
+# name
+# name nameId
+# name first
+# name last
+### use first x cast members
+### put the names into a comma-delimited list in a single column
 
+# crew
+# member
+# personId
+# ord
+# role					<- we want "Director"
+# name
+# name nameId
+# name first
+# name last
+### if there is more than one director, put each into a comma-delimited list in a single column
 
+# runTime
 
+# progType
 
+# holiday
+# holidayId
+# text
+
+# countries
+# country
+
+# awards
+# award
+# award won
+# award name
+# award name awardId
+# award name text
+# award category
+# award category awardCatId
+# award category text
+# award year
+# award recipient
+# award recipient nameId
+# award recipient text
+
+# genres
+# genre
+# genre genreId
+# genre text
+### if there are more than one genre, make a comma-delimited list in a single column
+
+# ratings
+### there are multiple ratings types that can show up here
+# qualityRating
+# qualityRating ratingsBody
+# qualityrating value
+# advisories
+# advisory
+# advisory text
+# rating
+# rating area				<- we want "United States"
+# rating code
+# rating description
+# rating ratingsBody
+# rating text
+
+# colorCode
+
+# movieInfo
+# movieInfo releases
+# movieInfo release
+# movieInfo release type	<- we want "Year" or "Original"
+# movieInfo release date
+# movieInfo release distributors
+# movieInfo release distributors name
+# movieInfo release distributors country
+# movieInfo soundMixes
+# movieInfo soundMix
+# movieInfo pictureFormats
+# movieInfo pictureFormat
+# movieInfo productionCompanies
+# movieInfo productionCompanies name
+
+# images
+# image
+# image type
+# image width
+# image height
+# image primary
+# image category
+# image URI
+# image caption
+
+# animation
+
+# origAudioLang
 
 
