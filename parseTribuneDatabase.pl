@@ -26,6 +26,16 @@ my ( $director_list, $crew, $crew_member, $crew_member_attributes, $crew_member_
 my ( $crew_member_name, $crew_member_name_attributes, $crew_member_name_id );
 my ( $crew_member_person_id, $crew_member_ord, $crew_member_role );
 my ( $crew_member_name_id, $crew_member_name_first, $crew_member_name_last );
+my ( $runtime, $progtype );
+my ( $holiday, $holiday_id, $holiday_text );
+my ( $countries, $country, $country_list );
+my ( $genres, $genre, $genre_id, $genre_text, $genre_list );
+my ( $ratings );
+my ( $advisories, $advisory, $advisory_list );
+my ( $rating, $rating_area, $rating_code, $rating_description, $rating_body, $rating_text );
+my ( $quality_rating_body, $quality_rating );
+my ( $color_code );
+	
 
 GetOptions(	'input|i=s'		=>	\$input_param,
 			'output|o=s'	=>	\$output_param,
@@ -101,7 +111,16 @@ print OUTPUT_FILE "TMSId\t" .
 					"title\t" .
 					"description\t" .
 					"cast\t" .
-					"director\n";
+					"director\t" .
+					"runtime\t" .
+					"progtype\t" .
+					"holiday\t" .
+					"countries\t" .
+					"genres\t" .
+					"advisories\t" .
+					"rating (US)\t" .
+					"qualityRating\t" .
+					"color code\n";
 
 ##### update header row as we figure out the right fields to use
 
@@ -234,11 +253,143 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 			}
 		}
 	}
-	
+		
 	# get runTime tag
+	if ( $program =~ m/<runTime>(.*?)<\/runTime>/ ) { $runtime = trim( $1 ); }
+		else { $runtime = ""; }
+	
+	# get progType tag
+	if ( $program =~ m/<progType>(.*?)<\/progType>/ ) { $progtype = trim( $1 ); }
+		else { $progtype = ""; }
+	
+	# get holiday tag
+	$holiday_id = "";
+	$holiday_text = "";
+	# get holiday tag ???  do we need this???
+	if ( $program =~ m/<holiday holidayId="(.*?)">(.*?)<\/holiday>/ ) {
+		$holiday_id = $1;
+		$holiday_text = $2;
+	}
+	
+	# get countries tag
+	# there can be more than one, so make a comma-delimited list
+	$country_list = "";
+	# get countries tag
+	if ( $program =~ m/<countries>(.*?)<\/countries>/ms ) {
+		$countries = trim( $1 );
+		while( $countries =~ m/<country>(.*?)<\/country>/gms ) {
+			$country = trim( $1 );
+			if ( $country_list ne "" ) { $country_list .= ", "; }
+			$country_list .= $country;
+		}
+	}
+	
+	# awards tag comes next
+	# I'm not sure we need this and it's too complex for a single column
+	
+	# get genres tag	
+	$genre_list = "";
+	# get genres tag
+	if ( $program =~ m/<genres>(.*?)<\/genres>/ms ) {
+		$genres = trim( $1 );
+		while ( $genres =~ m/<genre genreId="(.*?)">(.*?)<\/genre>/gms ) {
+			$genre_id = trim( $1 );
+			$genre_text = trim( $2 );
+			if ( $genre_list ne "" ) { $genre_list .= ", "; }
+			$genre_list .= $genre_text;
+		}
+	}
+	
+	# get ratings tag
+	if ( $program =~ m/<ratings>(.*?)<\/ratings>/ms ) {
+		$ratings = trim( $1 );
+
+		# there are three sub-tags: advisories, rating, and qualityRating
+		# they serve different purposes
+		# make three separate columns
+	
+		# advisories
+		$advisory_list = "";
+		if ( $ratings =~ m/<advisories>(.*?)<\/advisories>/ms ) {
+			$advisories = trim( $1 );
+			while( $advisories =~ m/<advisory>(.*?)<\/advisory>/gms ) {
+				$advisory = trim( $1 );
+				if ( $advisory_list ne "" ) { $advisory_list .= ", "; }
+				$advisory_list .= $advisory
+			}
+		}
+		
+		# rating
+		# get the US rating for now
+		# do we want to capture others as well?
+		while ( $ratings =~ m/(<rating .*?>.*?<\/rating>)/gms ) {
+			$rating = trim( $1 );
+			if ( ( $rating =~ m/area="United States"/ms ) && ( $rating =~ m/code="(.*?)"/ms ) ) {
+				$rating_code = $1;
+			}
+		}
+		
+		# qualityRating
+		# this one is a little unusual - there is no value, so it's closed tag
+		if ( $ratings =~ m/<qualityRating ratingsBody="(.*?)" value="(.*?)"\/>/ ) {
+			$quality_rating_body = trim( $1 );
+			$quality_rating = trim( $2 );
+		} else { $quality_rating = ""; }
+	}
+	
+	# get color code tag
+	if ( $program =~ m/<colorCode>(.*?)<\/colorCode>/ms ) {
+		$color_code = unescape( trim( $1 ) );
+	} else { $color_code = ""; }
+	
+	# get movieInfo tag
+	# this one can get complicated
+	# there are multiple sub tags
+	# 	releases
+	#		multiple release types
+	#			Year
+	#			Original
+	#			Wide
+	#			others?
+	#	soundMixes
+	# 	pictureFormats
+	# 	productionCompanies
+	#		can be more than one
+
+
+
+
+
+# <movieInfo>
+# 	<releases>
+#		 <release type="Year" date="1968"/>
+#		 <release type="Original" date="1968-06-12">
+#			 <distributors>
+#				 <name>Paramount Pictures</name>
+#			 </distributors>
+# 			<country>USA</country>
+# 		</release>
+# 		<release type="Wide" date="1968-06-12">
+# 			<distributors>
+# 				<name>Paramount Pictures</name>
+# 			</distributors>
+# 			<country>USA</country>
+# 		</release>
+#	 </releases>
+# 	<soundMixes>
+# 		<soundMix>Mono</soundMix>
+# 	</soundMixes>
+# 	<pictureFormats>
+# 		<pictureFormat>Flat (1.85:1)</pictureFormat>
+# 	</pictureFormats>
+# 	<productionCompanies>
+# 		<name>Paramount Pictures</name>
+# 	</productionCompanies>
+# </movieInfo>
 	
 	
-	
+
+
 	
 	print OUTPUT_FILE "$TMSId\t" .
 						"$altFilmId\t" .
@@ -247,7 +398,16 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 						"$title_text\t" .
 						"$description_text\t" .
 						"$cast_list\t" .
-						"$director_list\n";
+						"$director_list\t" .
+						"$runtime\t" .
+						"$progtype\t" .
+						"$holiday_text\t" .
+						"$country_list\t" .
+						"$genre_list\t" .
+						"$advisory_list\t" .
+						"$rating_code\t" .
+						"$quality_rating\t" .
+						"$color_code\n";
 			
 }
 
