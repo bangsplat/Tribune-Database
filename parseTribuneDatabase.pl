@@ -5,9 +5,9 @@
 #
 # parse Tribune database XML into tab-delimited text file
 #
-# version 0
+# version 0.1
 # created 2013-01-03
-# modified 2013-01-03
+# modified 2013-01-04
 #
 
 use strict;
@@ -35,7 +35,22 @@ my ( $advisories, $advisory, $advisory_list );
 my ( $rating, $rating_area, $rating_code, $rating_description, $rating_body, $rating_text );
 my ( $quality_rating_body, $quality_rating );
 my ( $color_code );
-	
+my ( $movie_info );
+my ( $releases, $release, $release_type, $release_date, $release_attributes );
+my ( $original_release_year, $original_release_date );
+my ( $distributors, $distributor, $distributor_name, $distribution_country );
+my ( $sound_mixes, $sound_mix );
+my ( $picture_formats, $picture_format );
+my ( $production_companies, $production_company_name );
+my ( $trailers, $trailer, $trailer_format, $trailer_url );
+my ( $sound_mixes, $sound_mix, $sound_mix_text, $sound_mix_list );
+my ( $picture_formats, $picture_format, $picture_format_list );
+my ( $production_compaies, $production_company_name, $production_company_list );
+my ( $definitve_original_release_date, $definitive_distributor_name, $definitive_distribution_country );
+my ( $official_url, $trailers, $trailer, $trailer_format, $trailer_url );
+my ( $images, $image, $image_attributes, $image_type, $image_width, $iamge_height );
+my ( $image_primary, $image_category, $image_uri, $image_caption );
+my ( $animation, $original_audio_language );
 
 GetOptions(	'input|i=s'		=>	\$input_param,
 			'output|o=s'	=>	\$output_param,
@@ -120,7 +135,19 @@ print OUTPUT_FILE "TMSId\t" .
 					"advisories\t" .
 					"rating (US)\t" .
 					"qualityRating\t" .
-					"color code\n";
+					"color code\t" .
+					"release year\t" .
+					"original release date\t" .
+					"original distributor\t" .
+					"original release country\t" .
+					"sound mixes\t" .
+					"picture formats\t" .
+					"production companies\t" .
+					"official url\t" .
+					"trailer\t" .
+					"poster art\t" .
+					"animation\t" .
+					"original audio language\n";
 
 ##### update header row as we figure out the right fields to use
 
@@ -341,55 +368,176 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 	if ( $program =~ m/<colorCode>(.*?)<\/colorCode>/ms ) {
 		$color_code = unescape( trim( $1 ) );
 	} else { $color_code = ""; }
+
 	
+
 	# get movieInfo tag
-	# this one can get complicated
-	# there are multiple sub tags
-	# 	releases
-	#		multiple release types
-	#			Year
-	#			Original
-	#			Wide
-	#			others?
-	#	soundMixes
-	# 	pictureFormats
-	# 	productionCompanies
-	#		can be more than one
+	if ( $program =~ m/<movieInfo>(.*?)<\/movieInfo>/ms ) {
+		$movie_info = trim( $1 );
+		
+		# there are multiple subtags here
+		# 	releases
+		#		multiple release types
+		#			Year
+		#			Original
+		#			Wide
+		#			others?
+		#	soundMixes
+		# 	pictureFormats
+		# 	productionCompanies
+		#		can be more than one
+		#	officialURL
+		# 	trailers
+		#		trailer
+		#			format
+		#			url
+		
+		# releases
+		$original_release_year = "";
+		$original_release_date = "";
+		$distributor_name = "";
+		$distribution_country = "";
+		$definitve_original_release_date = "";
+		$definitive_distributor_name = "";
+		$definitive_distribution_country = "";
+		if ( $movie_info =~ m/<releases>(.*?)<\/releases>/ms ) {
+			$releases = trim( $1 );
 
+			# release year is different from the rest :(
+			if ( $releases =~ m/<release type="Year" date="(.*?)"\/>/ms ) {
+				$original_release_year = trim( $1 );
+			}
 
+			## when we have both a release year and original release tag,
+			## we have to do this a little differently to avoid finding the closed tag
+			while ( $releases =~ m/<release ([^\/]*?)>(.*?)<\/release>/gms ) {
+				$release_attributes = trim( $1 );
+				$release = trim( $2 );
+				if ( $release_attributes =~ m/type="Original"/ ) {
+					## unfortunately, doing things this way has the downside of finding the last
+					## original release tag - and runs the risk of mixing up data between them.
+					## so we need to clear out the output variable for each find to only give us
+					## the last original release tag
+					##
+					## should we check the country against $country_list?
+					## make a separate $definitve_original_release_date, $definitive_distributor_name, $definitive_distribution_company
+					## and if ( $distribution_country eq $country_list )
+					## 		set these values
+					$original_release_date = "";
+					$distributor_name = "";
+					$distribution_country = "";
+					if ( $release_attributes =~ m/date="(.*?)"/ ) {
+						$original_release_date = trim( $1 );
+					}
+					if ( $release =~ m/<distributors>(.*?)<\/distributors>/ms ) {
+						$distributor = trim( $1 );
+						if ( $distributor =~ m/<name>(.*?)<\/name>/ms ) {
+							$distributor_name = unescape( trim( $1 ) ) ;
+						}
+					}
+					if ( $release =~ m/<country>(.*?)<\/country>/ms ) {
+						$distribution_country = unescape( trim( $1 ) );
+					}
+					## check this release's country against $country_list
+					## if they match, we should use this one for sure
+					if ( $distributor_name eq $country_list ) {
+						$definitve_original_release_date = $original_release_date;
+						$definitive_distributor_name = $distributor_name;
+						$definitive_distribution_country = $distribution_country;
+					}
+				}
+			}
+			
+			## now check to see if we came up with a definitive original distribution
+			## if we have, use that instead of whatever else we landed on
+			if ( $definitve_original_release_date ne "" ) {
+				$original_release_date = "$definitve_original_release_date";
+				$distributor_name = "$definitive_distributor_name";
+				$distribution_country = "$definitive_distribution_country";
+			}
+			
+			###
+			###	OK, so this still isn't perfect
+			###
+			###	turns out, if there was a staged release in the original country,
+			###	it isn't listed as "Original"
+			### but it lists "Limted" or "Expanded" or "Wide"
+			### should we look for earliest date with the original country or release?
+			###
+			###	think about this and come back to it
+			###
+			
+		}
 
-
-
-# <movieInfo>
-# 	<releases>
-#		 <release type="Year" date="1968"/>
-#		 <release type="Original" date="1968-06-12">
-#			 <distributors>
-#				 <name>Paramount Pictures</name>
-#			 </distributors>
-# 			<country>USA</country>
-# 		</release>
-# 		<release type="Wide" date="1968-06-12">
-# 			<distributors>
-# 				<name>Paramount Pictures</name>
-# 			</distributors>
-# 			<country>USA</country>
-# 		</release>
-#	 </releases>
-# 	<soundMixes>
-# 		<soundMix>Mono</soundMix>
-# 	</soundMixes>
-# 	<pictureFormats>
-# 		<pictureFormat>Flat (1.85:1)</pictureFormat>
-# 	</pictureFormats>
-# 	<productionCompanies>
-# 		<name>Paramount Pictures</name>
-# 	</productionCompanies>
-# </movieInfo>
+		# soundMixes
+		$sound_mix_list = "";
+		if ( $movie_info =~ m/<soundMixes>(.*?)<\/soundMixes>/ms ) {
+			$sound_mixes = trim( $1 );
+			while( $sound_mixes =~ m/<soundMix>(.*?)<\/soundMix>/gms ) {
+				$sound_mix = unescape( trim( $1 ) );
+				if ( $sound_mix_list ne "" ) { $sound_mix_list .= ", "; }
+				$sound_mix_list .= $sound_mix;
+			}
+		}
+		
+		# pictureFormats
+		$picture_format_list = "";
+		if ( $movie_info =~ m/<pictureFormats>(.*?)<\/pictureFormats>/ms ) {
+			$picture_formats = trim( $1 );
+			while( $picture_formats =~ m/<pictureFormat>(.*?)<\/pictureFormat>/gms ) {
+				$picture_format = unescape( trim( $1 ) );
+				if ( $picture_format_list ne "" ) { $picture_format_list .= ", "; }
+				$picture_format_list .= $picture_format;
+			}
+		}
+		
+		# productionCompanies
+		$production_company_list = "";
+		if ( $movie_info =~ m/<productionCompanies>(.*?)<\/productionCompanies>/ms ) {
+			$production_companies = trim( $1 );
+			while( $production_companies =~ m/<name>(.*?)<\/name>/gms ) {
+				$production_company_name = unescape( trim( $1 ) );
+				if ( $production_company_list ne "" ) { $production_company_list .= ", "; }
+				$production_company_list .= $production_company_name;
+			}
+		}
+		
+		# officialURL
+		if ( $movie_info =~ m/<officialURL>(.*?)<\/officialURL>/ms ) {
+			$official_url = trim( $1 );
+		} else {
+			$official_url = "";
+		}
+		
+		# trailers
+		$trailer_url = "";
+		if ( $movie_info =~ m/<trailers>(.*?)<\/trailers>/ms ) {
+			$trailers = trim( $1 );
+			## there could be more than one trailer listed, but I haven't seen it yet
+			## let's do the same as above - use the last one listed if there are more than one
+			if ( $trailers =~ m/<URL>(.*?)<\/URL>/ms ) {
+				$trailer_url = trim( $1 );
+			}
+		}
+	}
 	
+	# get images tag
+	### what we really want here is the biggest Poster Art image URL
+	### however, these are partial URLs, so I don't know how much help this is, really
+	### stub it out for now
+	$image_uri = "";
 	
-
-
+#	my ( $images, $image, $image_attributes, $image_type, $image_width, $iamge_height );
+#	my ( $image_primary, $image_category, $image_uri, $image_caption );
+	
+	# get animation tag
+	if ( $program =~ m/<animation>(.*?)<\/animation>/ms ) { $animation = trim( $1 ); }
+		else { $animation = ""; }
+	
+	# get origAudioLang tag
+	if ( $program =~ m/<origAudioLang>(.*?)<\/origAudioLang>/ms ) { $original_audio_language = trim( $1 ); }
+		else { $original_audio_language = ""; }
+	
 	
 	print OUTPUT_FILE "$TMSId\t" .
 						"$altFilmId\t" .
@@ -407,95 +555,25 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 						"$advisory_list\t" .
 						"$rating_code\t" .
 						"$quality_rating\t" .
-						"$color_code\n";
+						"$color_code\t" .
+						"$original_release_year\t" .
+						"$original_release_date\t" .
+						"$distributor_name\t" .
+						"$distribution_country\t" .
+						"$sound_mix_list\t" .
+						"$picture_format_list\t" .
+						"$production_company_list\t" .
+						"$official_url\t" .
+						"$trailer_url\t" .
+						"$image_uri\t" .
+						"$animation\t" .
+						"$original_audio_language\n";
 			
 }
 
+
+
 close( OUTPUT_FILE );
-
-
-### XML fields
-
-# runTime
-
-# progType
-
-# holiday
-# holidayId
-# text
-
-# countries
-# country
-
-# awards
-# award
-# award won
-# award name
-# award name awardId
-# award name text
-# award category
-# award category awardCatId
-# award category text
-# award year
-# award recipient
-# award recipient nameId
-# award recipient text
-
-# genres
-# genre
-# genre genreId
-# genre text
-### if there are more than one genre, make a comma-delimited list in a single column
-
-# ratings
-### there are multiple ratings types that can show up here
-# qualityRating
-# qualityRating ratingsBody
-# qualityrating value
-# advisories
-# advisory
-# advisory text
-# rating
-# rating area				<- we want "United States"
-# rating code
-# rating description
-# rating ratingsBody
-# rating text
-
-# colorCode
-
-# movieInfo
-# movieInfo releases
-# movieInfo release
-# movieInfo release type	<- we want "Year" or "Original"
-# movieInfo release date
-# movieInfo release distributors
-# movieInfo release distributors name
-# movieInfo release distributors country
-# movieInfo soundMixes
-# movieInfo soundMix
-# movieInfo pictureFormats
-# movieInfo pictureFormat
-# movieInfo productionCompanies
-# movieInfo productionCompanies name
-
-# images
-# image
-# image type
-# image width
-# image height
-# image primary
-# image category
-# image URI
-# image caption
-
-# animation
-
-# origAudioLang
-
-
-
-
 
 sub trim($) {
 	my $myString = shift;
