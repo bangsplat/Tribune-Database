@@ -5,9 +5,9 @@
 #
 # parse Tribune database XML into tab-delimited text file
 #
-# version 0.1
+# version 0.2
 # created 2013-01-03
-# modified 2013-01-04
+# modified 2013-01-07
 #
 
 use strict;
@@ -67,13 +67,13 @@ if ( $debug_param ) {
 }
 
 if ( $version_param ) {
-	print "parseTribuneDatabase.pl version 0\n";
+	print "parseTribuneDatabase.pl version 0.2\n";
 	exit;
 }
 
 if ( $help_param ) {
 	print "parsecatalog.pl\n\n";
-	print "version 0\n\n";
+	print "version 0.2\n\n";
 	print "--input <filename>\n";
 	print "\tfile to process (required)\n";
 	print "--output <filename>\n";
@@ -149,7 +149,11 @@ print OUTPUT_FILE "TMSId\t" .
 					"animation\t" .
 					"original audio language\n";
 
-##### update header row as we figure out the right fields to use
+##### we have a number of items that are replicating last value down
+##### make sure we are clearing output values before searching
+##### fields I've noticed:
+#####		rating (including advisory and quality rating)
+#####		color/b&w ?????
 
 ## here is where we parse the feed
 
@@ -168,13 +172,13 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 		else { $connectorId = ""; }
 	
 	# get the titles tag
+	$title_text = "";
 	if ( $program =~ m/<titles>(.*?)<\/titles>/ms ) {
 		$titles = trim( $1 );
 		
 		# there may be more than one <title>
 		# we want the one where type="full"
 		
-		$title_text = "";
 		while ( $titles =~ m/<title (.*?)>(.*?)<\/title>/gms ) {
 			$title_attributes = trim( $1 );
 			$title = trim( $2 );
@@ -183,6 +187,7 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 	}
 	
 	#  get the descriptions tag
+	$description_text = "";
 	if ( $program =~ m/<descriptions>(.*?)<\/descriptions>/ms ) {
 		$descriptions = trim( $1 );
 		
@@ -328,6 +333,9 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 	}
 	
 	# get ratings tag
+	$advisory_list = "";
+	$rating_code = "";
+	$quality_rating = "";
 	if ( $program =~ m/<ratings>(.*?)<\/ratings>/ms ) {
 		$ratings = trim( $1 );
 
@@ -368,9 +376,8 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 	if ( $program =~ m/<colorCode>(.*?)<\/colorCode>/ms ) {
 		$color_code = unescape( trim( $1 ) );
 	} else { $color_code = ""; }
-
 	
-
+	
 	# get movieInfo tag
 	if ( $program =~ m/<movieInfo>(.*?)<\/movieInfo>/ms ) {
 		$movie_info = trim( $1 );
@@ -505,9 +512,7 @@ while ( $xml_file =~ m/<program (.*?)>(.*?)<\/program>/gms ) {
 		# officialURL
 		if ( $movie_info =~ m/<officialURL>(.*?)<\/officialURL>/ms ) {
 			$official_url = trim( $1 );
-		} else {
-			$official_url = "";
-		}
+		} else { $official_url = ""; }
 		
 		# trailers
 		$trailer_url = "";
